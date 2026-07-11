@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { createClient } from "@/lib/supabase";
 import { useAuth } from "@/components/layout/auth-provider";
-import { useMembership } from "@/components/layout/membership-provider";
 import type { ChatMessage } from "@/types";
 
 type Conversation = {
@@ -26,7 +25,6 @@ type Conversation = {
 
 export default function ChatPage() {
   const { user } = useAuth();
-  const { plan, canAccess } = useMembership();
   const supabase = createClient();
   const [messages, setMessages] = useState<(ChatMessage & { isAdmin?: boolean })[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -40,30 +38,17 @@ export default function ChatPage() {
   const [showList, setShowList] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const canChat = canAccess("silver");
-
-  // Check admin status
+  // Check admin status by email
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("profiles")
-      .select("is_admin")
-      .eq("id", user.id)
-      .single()
-      .then(({ data }) => {
-        setIsAdmin(data?.is_admin || false);
-        setAdminChecked(true);
-      });
-  }, [user, supabase]);
+    const admin = user.email === "biniyammulat51@gmail.com";
+    setIsAdmin(admin);
+    setAdminChecked(true);
+  }, [user]);
 
   // Load conversations (admin) or user conversation
   useEffect(() => {
     if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    if (!isAdmin && !canChat) {
       setLoading(false);
       return;
     }
@@ -115,7 +100,7 @@ export default function ChatPage() {
     };
 
     load();
-  }, [user, canChat, isAdmin, supabase]);
+  }, [user, isAdmin, supabase]);
 
   // Load messages for a conversation
   const loadMessages = async (conversationId: string) => {
@@ -348,33 +333,6 @@ export default function ChatPage() {
               </div>
             )}
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Membership gate (non-admin users need Silver+)
-  if (!canChat) {
-    return (
-      <div className="flex min-h-[70vh] items-center justify-center px-4">
-        <div className="text-center max-w-md">
-          <div className="mb-4 flex justify-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gold/10">
-              <Lock className="h-8 w-8 text-gold" />
-            </div>
-          </div>
-          <Badge className="mb-3 bg-gold/10 text-gold border-gold/20">Silver+ Feature</Badge>
-          <h2 className="text-2xl font-bold mb-2">Membership Required</h2>
-          <p className="text-sm text-muted-foreground/70 mb-6">
-            The chat system is available for Silver and Gold members only.
-            Upgrade your membership to start chatting.
-          </p>
-          <Link href="/membership">
-            <Button className="bg-gold text-black hover:bg-gold-dark">
-              <Crown className="mr-2 h-4 w-4" />
-              View Plans
-            </Button>
-          </Link>
         </div>
       </div>
     );
