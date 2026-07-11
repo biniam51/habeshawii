@@ -219,34 +219,7 @@ export default function ChatPage() {
     );
   }
 
-  // Not a member
-  if (!canChat) {
-    return (
-      <div className="flex min-h-[70vh] items-center justify-center px-4">
-        <div className="text-center max-w-md">
-          <div className="mb-4 flex justify-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gold/10">
-              <Lock className="h-8 w-8 text-gold" />
-            </div>
-          </div>
-          <Badge className="mb-3 bg-gold/10 text-gold border-gold/20">Silver+ Feature</Badge>
-          <h2 className="text-2xl font-bold mb-2">Membership Required</h2>
-          <p className="text-sm text-muted-foreground/70 mb-6">
-            The chat system is available for Silver and Gold members only.
-            Upgrade your membership to start chatting.
-          </p>
-          <Link href={plan === "free" ? "/membership" : "/membership"}>
-            <Button className="bg-gold text-black hover:bg-gold-dark">
-              <Crown className="mr-2 h-4 w-4" />
-              {plan === "free" ? "View Plans" : "Upgrade"}
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // Admin view
+  // Admin view (bypasses membership check)
   if (isAdmin) {
     return (
       <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-6xl flex-col px-4 py-4 sm:px-6">
@@ -359,6 +332,33 @@ export default function ChatPage() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Membership gate (non-admin users need Silver+)
+  if (!canChat) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <div className="mb-4 flex justify-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gold/10">
+              <Lock className="h-8 w-8 text-gold" />
+            </div>
+          </div>
+          <Badge className="mb-3 bg-gold/10 text-gold border-gold/20">Silver+ Feature</Badge>
+          <h2 className="text-2xl font-bold mb-2">Membership Required</h2>
+          <p className="text-sm text-muted-foreground/70 mb-6">
+            The chat system is available for Silver and Gold members only.
+            Upgrade your membership to start chatting.
+          </p>
+          <Link href="/membership">
+            <Button className="bg-gold text-black hover:bg-gold-dark">
+              <Crown className="mr-2 h-4 w-4" />
+              View Plans
+            </Button>
+          </Link>
         </div>
       </div>
     );
