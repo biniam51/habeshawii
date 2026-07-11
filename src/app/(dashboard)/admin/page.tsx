@@ -12,6 +12,7 @@ export default function AdminOverview() {
   const supabase = useMemo(() => createClient(), []);
   const [stats, setStats] = useState({ videos: 0, shorts: 0, models: 0, users: 0, revenue: 0 });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -19,27 +20,44 @@ export default function AdminOverview() {
       router.push("/");
       return;
     }
-    Promise.all([
-      supabase.from("videos").select("id", { count: "exact", head: true }),
-      supabase.from("shorts").select("id", { count: "exact", head: true }),
-      supabase.from("models").select("id", { count: "exact", head: true }),
-      supabase.from("profiles").select("id", { count: "exact", head: true }),
-    ]).then(([v, s, m, u]) => {
-      setStats({
-        videos: v.count ?? 0,
-        shorts: s.count ?? 0,
-        models: m.count ?? 0,
-        users: u.count ?? 0,
-        revenue: 0,
-      });
+    async function loadStats() {
+      try {
+        const [v, s, m, u] = await Promise.all([
+          supabase.from("videos").select("id"),
+          supabase.from("shorts").select("id"),
+          supabase.from("models").select("id"),
+          supabase.from("profiles").select("id"),
+        ]);
+        setStats({
+          videos: v.data?.length ?? 0,
+          shorts: s.data?.length ?? 0,
+          models: m.data?.length ?? 0,
+          users: u.data?.length ?? 0,
+          revenue: 0,
+        });
+      } catch (e: any) {
+        setError(e?.message || "Failed to load stats");
+      }
       setLoading(false);
-    });
+    }
+    loadStats();
   }, [user]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-center">
+          <p className="text-red-500 mb-2">{error}</p>
+          <p className="text-zinc-500 text-sm">Make sure all database tables exist and RLS policies are correct.</p>
+        </div>
       </div>
     );
   }
