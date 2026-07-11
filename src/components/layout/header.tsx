@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Menu, X, User, Crown, LogOut, LayoutDashboard } from "lucide-react";
+import { Menu, X, User, Crown, LogOut, LayoutDashboard, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import {
@@ -71,6 +71,10 @@ export function Header() {
                 <DropdownMenuItem render={<Link href="/dashboard" />}>
                   <LayoutDashboard className="mr-2 h-4 w-4" />
                   Dashboard
+                </DropdownMenuItem>
+                <DropdownMenuItem render={<Link href="/chat" />}>
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  Messages
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -149,6 +153,12 @@ export function Header() {
                       <Button variant="ghost" className="w-full justify-start">
                         <LayoutDashboard className="mr-2 h-4 w-4" />
                         Dashboard
+                      </Button>
+                    </Link>
+                    <Link href="/chat" onClick={() => setOpen(false)}>
+                      <Button variant="ghost" className="w-full justify-start">
+                        <MessageCircle className="mr-2 h-4 w-4" />
+                        Messages
                       </Button>
                     </Link>
                     <Button
