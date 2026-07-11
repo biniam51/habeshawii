@@ -36,6 +36,7 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConv, setSelectedConv] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminChecked, setAdminChecked] = useState(false);
   const [showList, setShowList] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -51,6 +52,7 @@ export default function ChatPage() {
       .single()
       .then(({ data }) => {
         setIsAdmin(data?.is_admin || false);
+        setAdminChecked(true);
       });
   }, [user, supabase]);
 
@@ -215,6 +217,15 @@ export default function ChatPage() {
             <Button className="bg-gold text-black hover:bg-gold-dark">Sign In</Button>
           </Link>
         </div>
+      </div>
+    );
+  }
+
+  // Wait for admin check to finish before deciding what to show
+  if (!adminChecked) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-gold" />
       </div>
     );
   }
