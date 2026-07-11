@@ -158,22 +158,32 @@ export default function ChatPage() {
 
   // Send a message
   const sendMessage = async () => {
+    console.log("Send clicked:", { convId, user: user?.id, msg: newMessage, sending });
     if (!newMessage.trim() || !convId || !user || sending) return;
 
     setSending(true);
     const msg = newMessage.trim();
     setNewMessage("");
 
-    const { error } = await supabase.from("chat_messages").insert({
-      conversation_id: convId,
-      user_id: user.id,
-      message: msg,
-      is_admin: isAdmin,
-    });
+    console.log("Inserting message:", { conversation_id: convId, user_id: user.id, is_admin: isAdmin });
+
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .insert({
+        conversation_id: convId,
+        user_id: user.id,
+        message: msg,
+        is_admin: isAdmin,
+      })
+      .select();
+
+    console.log("Insert result:", { data, error });
 
     if (error) {
       console.error("Send error:", error);
-      toast.error("Failed to send: " + error.message);
+      toast.error("Failed: " + error.message);
+    } else {
+      toast.success("Message sent!");
     }
 
     setSending(false);
