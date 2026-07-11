@@ -1,431 +1,183 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { Send, Crown, Lock, MessageCircle, User, ChevronLeft, Loader2, AlertCircle } from "lucide-react";
+import { useEffect, useState, useRef, useMemo } from "react";
+import { useAuth } from "@/components/layout/auth-provider";
+import { createClient } from "@/lib/supabase";
+import { Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { createClient } from "@/lib/supabase";
-import { useAuth } from "@/components/layout/auth-provider";
-import { toast } from "sonner";
-import type { ChatMessage } from "@/types";
 
-type Conversation = {
+interface Message {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  message: string;
+  is_admin: boolean;
+  created_at: string;
+}
+
+interface Conversation {
   id: string;
   user_id: string;
-  user_email: string;
-  user_name: string;
-  last_message: string;
   last_message_at: string;
-  unread: number;
-};
+  profiles?: { display_name?: string; avatar_url?: string };
+}
 
 export default function ChatPage() {
   const { user } = useAuth();
-  const supabase = createClient();
-  const [messages, setMessages] = useState<(ChatMessage & { isAdmin?: boolean })[]>([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [convId, setConvId] = useState<string | null>(null);
+  const supabase = useMemo(() => createClient(), []);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversation, setActiveConversation] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConv, setSelectedConv] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [adminChecked, setAdminChecked] = useState(false);
-  const [showList, setShowList] = useState(true);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isAdmin = user?.email === "biniyammulat51@gmail.com";
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Check admin status by email
   useEffect(() => {
     if (!user) return;
-    const admin = user.email === "biniyammulat51@gmail.com";
-    setIsAdmin(admin);
-    setAdminChecked(true);
-  }, [user]);
-
-  // Load conversations (admin) or user conversation
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
+    setLoading(true);
+    if (isAdmin) {
+      supabase.from("chat_conversations").select("*").order("last_message_at", { ascending: false }).then(({ data: convs }) => {
+        if (convs) {
+          supabase.from("profiles").select("id, display_name, avatar_url").then(({ data: profs }) => {
+            const profileMap = new Map((profs || []).map((p) => [p.id, p]));
+            setConversations(convs.map((c) => ({ ...c, profiles: profileMap.get(c.user_id) })));
+            setLoading(false);
+          });
+        } else setLoading(false);
+      });
       return;
     }
-
-    const load = async () => {
-      if (isAdmin) {
-        // Admin: load all conversations
-        const { data: convs } = await supabase
-          .from("chat_conversations")
-          .select("*, user:profiles!user_id(email, full_name)")
-          .order("last_message_at", { ascending: false });
-
-        if (convs) {
-          setConversations(
-            convs.map((c: any) => ({
-              id: c.id,
-              user_id: c.user_id,
-              user_email: c.user?.email || "",
-              user_name: c.user?.full_name || "Unknown",
-              last_message: "",
-              last_message_at: c.last_message_at,
-              unread: 0,
-            }))
-          );
-        }
-        setLoading(false);
-      } else {
-        // User: get or create their conversation
-        let { data: conv } = await supabase
-          .from("chat_conversations")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (!conv) {
-          const { data: newConv } = await supabase
-            .from("chat_conversations")
-            .insert({ user_id: user.id })
-            .select()
-            .single();
-          conv = newConv;
-        }
-
-        if (conv) {
-          setConvId(conv.id);
-        }
-        setLoading(false);
+    supabase.from("chat_conversations").select("*").eq("user_id", user.id).maybeSingle().then(async ({ data: conv }) => {
+      if (!conv) {
+        const { data: newConv } = await supabase.from("chat_conversations").insert({ user_id: user.id }).select().single();
+        if (newConv) conv = newConv;
       }
-    };
+      if (conv) {
+        setActiveConversation(conv.id);
+        const { data: msgs } = await supabase.from("chat_messages").select("*").eq("conversation_id", conv.id).order("created_at", { ascending: true });
+        if (msgs) setMessages(msgs);
+      }
+      setLoading(false);
+    });
+  }, [user]);
 
-    load();
-  }, [user, isAdmin, supabase]);
-
-  // Load messages for a conversation
-  const loadMessages = async (conversationId: string) => {
-    const { data } = await supabase
-      .from("chat_messages")
-      .select("*")
-      .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true });
-
-    if (data) {
-      setMessages(data as ChatMessage[]);
-    }
-    setConvId(conversationId);
-  };
-
-  // Subscribe to real-time messages
   useEffect(() => {
-    if (!convId) return;
+    if (!activeConversation) return;
+    const sub = supabase.channel("chat-messages").on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_messages", filter: `conversation_id=eq.${activeConversation}` }, (payload) => {
+      setMessages((prev) => [...prev, payload.new as Message]);
+    }).subscribe();
+    return () => { supabase.removeChannel(sub); };
+  }, [activeConversation]);
 
-    const channel = supabase
-      .channel("chat-messages")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "chat_messages",
-          filter: `conversation_id=eq.${convId}`,
-        },
-        (payload) => {
-          const newMsg = payload.new as ChatMessage;
-          setMessages((prev) => [...prev, newMsg]);
-        }
-      )
-      .subscribe();
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [convId, supabase]);
-
-  // Auto scroll to bottom on new messages
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // Select a conversation (admin)
-  const selectConversation = async (conversationId: string) => {
-    setSelectedConv(conversationId);
-    setShowList(false);
-    setConvId(null);
-    await loadMessages(conversationId);
-  };
-
-  // Send a message
-  const sendMessage = async () => {
-    console.log("Send clicked:", { convId, user: user?.id, msg: newMessage, sending });
-    if (!newMessage.trim() || !convId || !user || sending) return;
-
+  async function sendMessage() {
+    if (!text.trim() || !activeConversation || sending || !user) return;
     setSending(true);
-    const msg = newMessage.trim();
-    setNewMessage("");
-
-    console.log("Inserting message:", { conversation_id: convId, user_id: user.id, is_admin: isAdmin });
-
-    const { data, error } = await supabase
-      .from("chat_messages")
-      .insert({
-        conversation_id: convId,
-        user_id: user.id,
-        message: msg,
-        is_admin: isAdmin,
-      })
-      .select();
-
-    console.log("Insert result:", { data, error });
-
-    if (error) {
-      console.error("Send error:", error);
-      toast.error("Failed: " + error.message);
-    } else {
-      toast.success("Message sent!");
-    }
-
+    const { error } = await supabase.from("chat_messages").insert({
+      conversation_id: activeConversation,
+      user_id: user.id,
+      message: text.trim(),
+      is_admin: isAdmin,
+    });
+    if (error) console.error("Send error:", error);
+    setText("");
     setSending(false);
-  };
+  }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
+  function selectConversation(convId: string) {
+    setActiveConversation(convId);
+    supabase.from("chat_messages").select("*").eq("conversation_id", convId).order("created_at", { ascending: true }).then(({ data }) => {
+      if (data) setMessages(data);
+    });
+  }
 
-  // Not logged in
-  if (!user) {
+  if (loading) {
     return (
-      <div className="flex min-h-[70vh] items-center justify-center px-4">
-        <div className="text-center">
-          <div className="mb-4 flex justify-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gold/10">
-              <MessageCircle className="h-8 w-8 text-gold" />
-            </div>
-          </div>
-          <h2 className="text-2xl font-bold mb-2">Sign in to Chat</h2>
-          <p className="text-sm text-muted-foreground/70 mb-6">
-            You need to sign in to access the chat system.
-          </p>
-          <Link href="/login">
-            <Button className="bg-gold text-black hover:bg-gold-dark">Sign In</Button>
-          </Link>
-        </div>
+      <div className="flex items-center justify-center min-h-[70vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
       </div>
     );
   }
 
-  // Wait for admin check to finish before deciding what to show
-  if (!adminChecked) {
-    return (
-      <div className="flex min-h-[70vh] items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-gold" />
-      </div>
-    );
-  }
-
-  // Admin view (bypasses membership check)
   if (isAdmin) {
     return (
-      <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-6xl flex-col px-4 py-4 sm:px-6">
-        <div className="mb-4 flex items-center gap-3">
-          <MessageCircle className="h-5 w-5 text-gold" />
-          <h1 className="text-xl font-bold">Messages</h1>
+      <div className="flex h-[calc(100vh-4rem)]">
+        <div className="w-80 border-r border-zinc-800 overflow-y-auto flex-shrink-0">
+          <div className="p-4 border-b border-zinc-800">
+            <h2 className="text-lg font-semibold">Conversations</h2>
+          </div>
+          {conversations.length === 0 ? (
+            <p className="p-4 text-zinc-500 text-sm">No conversations yet</p>
+          ) : (
+            conversations.map((conv) => (
+              <button
+                key={conv.id}
+                onClick={() => selectConversation(conv.id)}
+                className={`w-full p-4 text-left border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${activeConversation === conv.id ? "bg-zinc-800" : ""}`}
+              >
+                <p className="text-sm font-medium truncate">{conv.profiles?.display_name || "Anonymous User"}</p>
+                <p className="text-xs text-zinc-500 mt-1">{new Date(conv.last_message_at).toLocaleDateString()}</p>
+              </button>
+            ))
+          )}
         </div>
-
-        <div className="flex flex-1 overflow-hidden rounded-xl border border-border/40 bg-card/30 backdrop-blur-sm">
-          {/* Conversation list */}
-          <div className={`w-full border-r border-border/30 md:w-72 ${showList ? "" : "hidden md:block"}`}>
-            <div className="p-3 border-b border-border/30">
-              <Input placeholder="Search conversations..." className="bg-background text-sm h-9" />
-            </div>
-            <ScrollArea className="h-[calc(100%-3rem)]">
-              {conversations.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-                  <MessageCircle className="h-8 w-8 text-muted-foreground/20 mb-2" />
-                  <p className="text-sm text-muted-foreground/50">No conversations yet</p>
-                </div>
-              ) : (
-                conversations.map((conv) => (
-                  <button
-                    key={conv.id}
-                    onClick={() => selectConversation(conv.id)}
-                    className={`w-full flex items-center gap-3 p-3 text-left transition-colors hover:bg-accent/50 ${
-                      selectedConv === conv.id ? "bg-accent" : ""
-                    }`}
-                  >
-                    <Avatar className="h-9 w-9 shrink-0">
-                      <AvatarFallback className="bg-gold/10 text-gold text-xs">
-                        {conv.user_name.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{conv.user_name}</p>
-                      <p className="text-xs text-muted-foreground/60 truncate">{conv.user_email}</p>
-                    </div>
-                  </button>
-                ))
-              )}
-            </ScrollArea>
-          </div>
-
-          {/* Chat area */}
-          <div className={`flex flex-1 flex-col ${showList ? "hidden md:flex" : ""}`}>
-            {convId ? (
-              <>
-                <div className="flex items-center gap-3 border-b border-border/30 p-3 md:hidden">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setShowList(true); setConvId(null); }}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Avatar className="h-7 w-7">
-                    <AvatarFallback className="bg-gold/10 text-gold text-[10px]">A</AvatarFallback>
-                  </Avatar>
-                  <span className="text-sm font-medium">Conversation</span>
-                </div>
-
-                <ScrollArea className="flex-1 p-4">
-                  <div className="space-y-3">
-                    {messages.map((msg) => (
-                      <div
-                        key={msg.id}
-                        className={`flex ${msg.is_admin ? "justify-start" : "justify-end"}`}
-                      >
-                        <div
-                          className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
-                            msg.is_admin
-                              ? "bg-card border border-border/50 rounded-bl-sm"
-                              : "bg-gold text-black rounded-br-sm"
-                          }`}
-                        >
-                          <p>{msg.message}</p>
-                          <p className={`mt-1 text-[10px] ${msg.is_admin ? "text-muted-foreground/50" : "text-black/50"}`}>
-                            {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                    <div ref={messagesEndRef} />
-                  </div>
-                </ScrollArea>
-
-                <div className="border-t border-border/30 p-3">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Type a message..."
-                      value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      className="bg-background"
-                    />
-                    <Button
-                      size="icon"
-                      onClick={sendMessage}
-                      disabled={!newMessage.trim() || sending}
-                      className="bg-gold text-black hover:bg-gold-dark shrink-0"
-                    >
-                      {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="flex flex-1 items-center justify-center text-center">
-                <div>
-                  <MessageCircle className="mx-auto h-12 w-12 text-muted-foreground/20 mb-3" />
-                  <p className="text-sm text-muted-foreground/50">Select a conversation</p>
-                </div>
-              </div>
-            )}
-          </div>
+        <div className="flex-1 flex flex-col">
+          {activeConversation ? <MessagesView /> : <div className="flex-1 flex items-center justify-center text-zinc-500">Select a conversation</div>}
         </div>
       </div>
     );
   }
 
-  // User view
   return (
-    <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-3xl flex-col px-4 py-4 sm:px-6">
-      <div className="mb-4 flex items-center gap-3">
-        <MessageCircle className="h-5 w-5 text-gold" />
-        <h1 className="text-xl font-bold">Chat with Admin</h1>
+    <div className="max-w-3xl mx-auto h-[calc(100vh-4rem)] flex flex-col">
+      <div className="p-4 border-b border-zinc-800">
+        <h1 className="text-lg font-semibold">Messages</h1>
+        <p className="text-xs text-zinc-500">Chat with the team</p>
       </div>
-
-      <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-border/40 bg-card/30 backdrop-blur-sm">
-        <div className="flex items-center gap-3 border-b border-border/30 p-3">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="bg-gold/10 text-gold text-xs">
-              <Crown className="h-4 w-4" />
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="text-sm font-medium">HabeshaWii Support</p>
-            <p className="text-[10px] text-muted-foreground/50">Online</p>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="flex flex-1 items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-gold" />
-          </div>
-        ) : (
-          <>
-            <ScrollArea className="flex-1 p-4">
-              <div className="space-y-3">
-                {messages.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <MessageCircle className="h-10 w-10 text-muted-foreground/20 mb-3" />
-                    <p className="text-sm text-muted-foreground/70">Send a message to get started</p>
-                    <p className="text-xs text-muted-foreground/50 mt-1">We typically reply within a few hours</p>
-                  </div>
-                )}
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.is_admin ? "justify-start" : "justify-end"}`}
-                  >
-                    <div
-                      className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
-                        msg.is_admin
-                          ? "bg-card border border-border/50 rounded-bl-sm"
-                          : "bg-gold text-black rounded-br-sm"
-                      }`}
-                    >
-                      <p>{msg.message}</p>
-                      <p className={`mt-1 text-[10px] ${msg.is_admin ? "text-muted-foreground/50" : "text-black/50"}`}>
-                        {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
-            </ScrollArea>
-
-            <div className="border-t border-border/30 p-3">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Type a message..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="bg-background"
-                />
-                <Button
-                  size="icon"
-                  onClick={sendMessage}
-                  disabled={!newMessage.trim() || sending}
-                  className="bg-gold text-black hover:bg-gold-dark shrink-0"
-                >
-                  {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+      <MessagesView />
     </div>
   );
+
+  function MessagesView() {
+    return (
+      <>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.length === 0 ? (
+            <p className="text-zinc-500 text-sm text-center mt-8">No messages yet. Say hello!</p>
+          ) : (
+            messages.map((msg) => {
+              const isMine = msg.user_id === user!.id;
+              return (
+                <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[75%] rounded-2xl px-4 py-2 ${isMine ? "bg-amber-600 text-white rounded-br-sm" : "bg-zinc-800 text-zinc-100 rounded-bl-sm"}`}>
+                    {msg.is_admin && !isMine && <p className="text-[10px] text-amber-400 font-semibold mb-1">Admin</p>}
+                    <p className="text-sm">{msg.message}</p>
+                    <p className="text-[10px] text-zinc-400 text-right mt-1">{new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+          <div ref={bottomRef} />
+        </div>
+        <div className="p-4 border-t border-zinc-800">
+          <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} className="flex gap-2">
+            <Input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Type a message..."
+              className="flex-1 bg-zinc-800 border-zinc-700 focus-visible:ring-amber-500"
+            />
+            <Button type="submit" disabled={!text.trim() || sending} size="icon" className="bg-amber-600 hover:bg-amber-700">
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
+          </form>
+        </div>
+      </>
+    );
+  }
 }
