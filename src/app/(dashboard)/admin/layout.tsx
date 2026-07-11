@@ -10,6 +10,7 @@ import {
   MessageCircle,
   UserCircle,
   Crown,
+  DollarSign,
 } from "lucide-react";
 
 const adminLinks = [
@@ -17,6 +18,7 @@ const adminLinks = [
   { href: "/admin/videos", label: "Videos", icon: Video },
   { href: "/admin/shorts", label: "Shorts", icon: Clapperboard },
   { href: "/admin/models", label: "Models", icon: UserCircle },
+  { href: "/admin/payments", label: "Payments", icon: DollarSign },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/messages", label: "Messages", icon: MessageCircle },
 ];

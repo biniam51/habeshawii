@@ -22,18 +22,20 @@ export default function AdminOverview() {
     }
     async function loadStats() {
       try {
-        const [v, s, m, u] = await Promise.all([
+        const [v, s, m, u, p] = await Promise.all([
           supabase.from("videos").select("id"),
           supabase.from("shorts").select("id"),
           supabase.from("models").select("id"),
           supabase.from("profiles").select("id"),
+          supabase.from("payment_submissions").select("amount").eq("status", "approved"),
         ]);
+        const revenue = (p.data || []).reduce((sum, r) => sum + Number(r.amount), 0);
         setStats({
           videos: v.data?.length ?? 0,
           shorts: s.data?.length ?? 0,
           models: m.data?.length ?? 0,
           users: u.data?.length ?? 0,
-          revenue: 0,
+          revenue,
         });
       } catch (e: any) {
         setError(e?.message || "Failed to load stats");
