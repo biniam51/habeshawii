@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useState, useMemo, useRef } from "react";
+import { Suspense, useState, useMemo, useRef, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useAuth } from "@/components/layout/auth-provider";
 import { motion } from "framer-motion";
-import { ArrowLeft, Loader2, CheckCircle, Smartphone, Building2, Upload } from "lucide-react";
+import { ArrowLeft, Loader2, CheckCircle, Smartphone, Building2, Upload, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -25,6 +25,8 @@ function CheckoutContent() {
   const plan = searchParams.get("plan") || "bronze";
   const price = planPrices[plan] || 9.99;
 
+  const [existing, setExisting] = useState<any>(null);
+  const [checking, setChecking] = useState(true);
   const [method, setMethod] = useState<"telebirr" | "cbe">("telebirr");
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
   const [receiptBase64, setReceiptBase64] = useState<string | null>(null);
@@ -32,17 +34,20 @@ function CheckoutContent() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
-      setReceiptPreview(dataUrl);
-      setReceiptBase64(dataUrl);
-    };
-    reader.readAsDataURL(f);
-  }
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("payment_submissions")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data && data.status === "pending") setExisting(data);
+        setChecking(false);
+      });
+  }, [user]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -66,6 +71,43 @@ function CheckoutContent() {
 
     setDone(true);
     setSending(false);
+  }
+
+  if (checking) {
+    return (
+      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+        <CardContent className="flex justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-gold" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (existing) {
+    return (
+      <Card className="border-border/50 bg-card/50 backdrop-blur-sm text-center">
+        <CardContent className="pt-8 pb-8 space-y-4">
+          <div className="flex justify-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10">
+              <Clock className="h-8 w-8 text-amber-500" />
+            </div>
+          </div>
+          <CardTitle className="text-2xl font-bold">Pending Review</CardTitle>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+            You already submitted a payment for the <strong className="capitalize">{existing.plan}</strong> plan. It is currently being reviewed by the team.
+          </p>
+          {existing.receipt_data && (
+            <div className="flex justify-center">
+              <img src={existing.receipt_data} alt="Your receipt" className="max-h-40 rounded-lg border border-zinc-700" />
+            </div>
+          )}
+          <p className="text-xs text-zinc-500">Submitted {new Date(existing.created_at).toLocaleString()}</p>
+          <Button onClick={() => router.push("/membership")} variant="outline" className="gap-2">
+            <ArrowLeft className="h-4 w-4" /> Back to Plans
+          </Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   if (done) {
@@ -180,7 +222,17 @@ function CheckoutContent() {
                   <p className="text-xs text-zinc-600">PNG, JPG or WEBP</p>
                 </div>
               )}
-              <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleFile} />
+              <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                  const dataUrl = ev.target?.result as string;
+                  setReceiptPreview(dataUrl);
+                  setReceiptBase64(dataUrl);
+                };
+                reader.readAsDataURL(f);
+              }} />
             </div>
           </div>
 
