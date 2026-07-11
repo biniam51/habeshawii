@@ -15,18 +15,22 @@ CREATE TABLE IF NOT EXISTS payment_submissions (
 
 ALTER TABLE payment_submissions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can insert own payments" ON payment_submissions;
 CREATE POLICY "Users can insert own payments"
   ON payment_submissions FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can read own payments" ON payment_submissions;
 CREATE POLICY "Users can read own payments"
   ON payment_submissions FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Admins can read all payments" ON payment_submissions;
 CREATE POLICY "Admins can read all payments"
   ON payment_submissions FOR SELECT
   USING (public.is_admin());
 
+DROP POLICY IF EXISTS "Admins can update payments" ON payment_submissions;
 CREATE POLICY "Admins can update payments"
   ON payment_submissions FOR UPDATE
   USING (public.is_admin());
@@ -86,10 +90,12 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('receipts', 'receipts', true)
 ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "Users can upload receipts" ON storage.objects;
 CREATE POLICY "Users can upload receipts"
   ON storage.objects FOR INSERT
   WITH CHECK (bucket_id = 'receipts' AND auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Anyone can view receipts" ON storage.objects;
 CREATE POLICY "Anyone can view receipts"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'receipts');
