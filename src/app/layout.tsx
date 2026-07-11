@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "@/components/layout/providers";
 import { AuthProvider } from "@/components/layout/auth-provider";
+import { MembershipProvider } from "@/components/layout/membership-provider";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -22,10 +23,12 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col font-sans">
         <Providers>
           <AuthProvider>
+            <MembershipProvider>
             <Header />
             <main className="flex-1 pb-16 md:pb-0">{children}</main>
             <Footer />
             <MobileNav />
+            </MembershipProvider>
           </AuthProvider>
         </Providers>
       </body>
