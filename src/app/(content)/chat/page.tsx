@@ -23,6 +23,61 @@ interface Conversation {
   profiles?: { display_name?: string; avatar_url?: string };
 }
 
+function MessagesView({
+  messages,
+  userId,
+  text,
+  setText,
+  sending,
+  sendMessage,
+  bottomRef,
+}: {
+  messages: Message[];
+  userId: string | undefined;
+  text: string;
+  setText: (v: string) => void;
+  sending: boolean;
+  sendMessage: () => void;
+  bottomRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  return (
+    <>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 ? (
+          <p className="text-zinc-500 text-sm text-center mt-8">No messages yet. Say hello!</p>
+        ) : (
+          messages.map((msg) => {
+            const isMine = msg.user_id === userId;
+            return (
+              <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[75%] rounded-2xl px-4 py-2 ${isMine ? "bg-amber-600 text-white rounded-br-sm" : "bg-zinc-800 text-zinc-100 rounded-bl-sm"}`}>
+                  {msg.is_admin && !isMine && <p className="text-[10px] text-amber-400 font-semibold mb-1">Admin</p>}
+                  <p className="text-sm">{msg.message}</p>
+                  <p className="text-[10px] text-zinc-400 text-right mt-1">{new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={bottomRef} />
+      </div>
+      <div className="p-4 border-t border-zinc-800">
+        <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} className="flex gap-2">
+          <Input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Type a message..."
+            className="flex-1 bg-zinc-800 border-zinc-700 focus-visible:ring-amber-500"
+          />
+          <Button type="submit" disabled={!text.trim() || sending} size="icon" className="bg-amber-600 hover:bg-amber-700">
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </Button>
+        </form>
+      </div>
+    </>
+  );
+}
+
 export default function ChatPage() {
   const { user } = useAuth();
   const supabase = useMemo(() => createClient(), []);
@@ -126,7 +181,19 @@ export default function ChatPage() {
           )}
         </div>
         <div className="flex-1 flex flex-col">
-          {activeConversation ? <MessagesView /> : <div className="flex-1 flex items-center justify-center text-zinc-500">Select a conversation</div>}
+          {activeConversation ? (
+            <MessagesView
+              messages={messages}
+              userId={user?.id}
+              text={text}
+              setText={setText}
+              sending={sending}
+              sendMessage={sendMessage}
+              bottomRef={bottomRef}
+            />
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-zinc-500">Select a conversation</div>
+          )}
         </div>
       </div>
     );
@@ -138,46 +205,15 @@ export default function ChatPage() {
         <h1 className="text-lg font-semibold">Messages</h1>
         <p className="text-xs text-zinc-500">Chat with the team</p>
       </div>
-      <MessagesView />
+      <MessagesView
+        messages={messages}
+        userId={user?.id}
+        text={text}
+        setText={setText}
+        sending={sending}
+        sendMessage={sendMessage}
+        bottomRef={bottomRef}
+      />
     </div>
   );
-
-  function MessagesView() {
-    return (
-      <>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.length === 0 ? (
-            <p className="text-zinc-500 text-sm text-center mt-8">No messages yet. Say hello!</p>
-          ) : (
-            messages.map((msg) => {
-              const isMine = msg.user_id === user!.id;
-              return (
-                <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[75%] rounded-2xl px-4 py-2 ${isMine ? "bg-amber-600 text-white rounded-br-sm" : "bg-zinc-800 text-zinc-100 rounded-bl-sm"}`}>
-                    {msg.is_admin && !isMine && <p className="text-[10px] text-amber-400 font-semibold mb-1">Admin</p>}
-                    <p className="text-sm">{msg.message}</p>
-                    <p className="text-[10px] text-zinc-400 text-right mt-1">{new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
-                  </div>
-                </div>
-              );
-            })
-          )}
-          <div ref={bottomRef} />
-        </div>
-        <div className="p-4 border-t border-zinc-800">
-          <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} className="flex gap-2">
-            <Input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Type a message..."
-              className="flex-1 bg-zinc-800 border-zinc-700 focus-visible:ring-amber-500"
-            />
-            <Button type="submit" disabled={!text.trim() || sending} size="icon" className="bg-amber-600 hover:bg-amber-700">
-              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </Button>
-          </form>
-        </div>
-      </>
-    );
-  }
 }
