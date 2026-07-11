@@ -29,7 +29,11 @@ export default function AdminPayments() {
 
   async function load() {
     const { data } = await supabase.from("payment_submissions").select("*, profiles!user_id(email, full_name)").order("created_at", { ascending: false });
-    if (data) setSubmissions(data);
+    if (data) {
+      console.log("Payments loaded:", data.length, "items");
+      data.forEach((s: any) => console.log("receipt_data length for", s.id, ":", s.receipt_data?.length || 0));
+      setSubmissions(data);
+    }
     setLoading(false);
   }
 

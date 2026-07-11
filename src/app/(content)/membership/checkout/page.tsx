@@ -75,9 +75,11 @@ function CheckoutContent() {
     if (!ref.trim() || !user) return;
     setSending(true);
     setError("");
+    console.log("Submitting with receipt_data length:", screenshot?.length || 0);
     const { error: err } = await supabase.from("payment_submissions").insert({
       user_id: user.id, plan, amount: price, payment_method: method, transaction_ref: ref.trim(), receipt_data: screenshot,
     });
+    if (err) console.error("Insert error:", err);
     if (err) { setError(err.message); setSending(false); return; }
     setDone(true);
     setSending(false);
