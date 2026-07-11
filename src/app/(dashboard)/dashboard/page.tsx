@@ -3,16 +3,19 @@
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
 import { useAuth } from "@/components/layout/auth-provider";
+import { useRouter } from "next/navigation";
 import { Crown, User, Calendar, Loader2 } from "lucide-react";
 
 export default function UserDashboard() {
   const { user } = useAuth();
+  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
+    if (user.email === "biniyammulat51@gmail.com") { router.replace("/admin"); return; }
     supabase.from("profiles").select("*").eq("id", user.id).single().then(({ data }) => {
       if (data) setProfile(data);
       setLoading(false);
