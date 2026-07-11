@@ -14,6 +14,7 @@ type Submission = {
   amount: number;
   payment_method: string;
   receipt_url: string | null;
+  receipt_data: string | null;
   transaction_ref: string | null;
   status: string;
   created_at: string;
@@ -75,9 +76,9 @@ export default function AdminPayments() {
                   <p className="font-medium">{s.profiles?.full_name || s.profiles?.email || "Unknown"}</p>
                   <p className="text-zinc-500 capitalize">{s.plan} — ${s.amount.toFixed(2)} via {s.payment_method}</p>
                   <p className="text-zinc-500 text-xs">{new Date(s.created_at).toLocaleString()}</p>
-                  {s.receipt_url && (
-                    <a href={s.receipt_url} target="_blank" rel="noopener noreferrer" className="text-amber-500 hover:underline text-xs inline-block mt-1">
-                      <img src={s.receipt_url} alt="Payment receipt" className="max-h-32 rounded-lg mt-2 border border-zinc-700" />
+                  {(s.receipt_url || s.receipt_data) && (
+                    <a href={s.receipt_url || s.receipt_data || ""} target="_blank" rel="noopener noreferrer" className="text-amber-500 hover:underline text-xs inline-block mt-1">
+                      <img src={s.receipt_data || s.receipt_url || ""} alt="Payment receipt" className="max-h-40 rounded-lg mt-2 border border-zinc-700" />
                     </a>
                   )}
                 </div>

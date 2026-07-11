@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS payment_submissions (
   amount DECIMAL(10,2) NOT NULL,
   payment_method TEXT NOT NULL CHECK (payment_method IN ('telebirr', 'cbe')),
   receipt_url TEXT,
+  receipt_data TEXT,
   transaction_ref TEXT,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
   reviewed_by UUID REFERENCES auth.users(id),
@@ -86,16 +87,4 @@ CREATE TRIGGER on_payment_approved
   EXECUTE FUNCTION public.approve_payment();
 
 -- Storage bucket for receipts
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('receipts', 'receipts', true)
-ON CONFLICT (id) DO NOTHING;
 
-DROP POLICY IF EXISTS "Users can upload receipts" ON storage.objects;
-CREATE POLICY "Users can upload receipts"
-  ON storage.objects FOR INSERT
-  WITH CHECK (bucket_id = 'receipts' AND auth.role() = 'authenticated');
-
-DROP POLICY IF EXISTS "Anyone can view receipts" ON storage.objects;
-CREATE POLICY "Anyone can view receipts"
-  ON storage.objects FOR SELECT
-  USING (bucket_id = 'receipts');

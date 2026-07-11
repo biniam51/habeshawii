@@ -26,10 +26,23 @@ function CheckoutContent() {
   const price = planPrices[plan] || 9.99;
 
   const [method, setMethod] = useState<"telebirr" | "cbe">("telebirr");
-  const [file, setFile] = useState<File | null>(null);
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const [receiptBase64, setReceiptBase64] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setReceiptPreview(dataUrl);
+      setReceiptBase64(dataUrl);
+    };
+    reader.readAsDataURL(f);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,39 +50,21 @@ function CheckoutContent() {
     setSending(true);
     setError("");
 
-    try {
-      let receiptUrl: string | null = null;
+    const { error: insertError } = await supabase.from("payment_submissions").insert({
+      user_id: user.id,
+      plan,
+      amount: price,
+      payment_method: method,
+      receipt_data: receiptBase64,
+    });
 
-      if (file) {
-        const ext = file.name.split(".").pop();
-        const path = `${user.id}/${Date.now()}.${ext}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("receipts")
-          .upload(path, file);
-
-        if (uploadError) throw new Error(uploadError.message);
-
-        const { data: urlData } = supabase.storage
-          .from("receipts")
-          .getPublicUrl(path);
-
-        receiptUrl = urlData?.publicUrl || null;
-      }
-
-      const { error: insertError } = await supabase.from("payment_submissions").insert({
-        user_id: user.id,
-        plan,
-        amount: price,
-        payment_method: method,
-        receipt_url: receiptUrl,
-      });
-
-      if (insertError) throw new Error(insertError.message);
-
-      setDone(true);
-    } catch (e: any) {
-      setError(e.message);
+    if (insertError) {
+      setError(insertError.message);
+      setSending(false);
+      return;
     }
+
+    setDone(true);
     setSending(false);
   }
 
@@ -173,10 +168,10 @@ function CheckoutContent() {
               onClick={() => fileInputRef.current?.click()}
               className="border-2 border-dashed border-zinc-700 rounded-xl p-6 text-center cursor-pointer hover:border-amber-500/50 transition-colors"
             >
-              {file ? (
+              {receiptPreview ? (
                 <div className="space-y-2">
-                  <img src={URL.createObjectURL(file)} alt="Receipt preview" className="max-h-40 mx-auto rounded-lg" />
-                  <p className="text-xs text-zinc-500">{file.name}</p>
+                  <img src={receiptPreview} alt="Receipt preview" className="max-h-40 mx-auto rounded-lg" />
+                  <p className="text-xs text-zinc-500">Tap to change</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -185,13 +180,7 @@ function CheckoutContent() {
                   <p className="text-xs text-zinc-600">PNG, JPG or WEBP</p>
                 </div>
               )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="hidden"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-              />
+              <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleFile} />
             </div>
           </div>
 
