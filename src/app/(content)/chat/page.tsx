@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Send, Crown, Lock, MessageCircle, User, ChevronLeft, Loader2 } from "lucide-react";
+import { Send, Crown, Lock, MessageCircle, User, ChevronLeft, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { createClient } from "@/lib/supabase";
 import { useAuth } from "@/components/layout/auth-provider";
+import { toast } from "sonner";
 import type { ChatMessage } from "@/types";
 
 type Conversation = {
@@ -170,15 +171,11 @@ export default function ChatPage() {
       is_admin: isAdmin,
     });
 
-    // Update last_message_at on conversation
-    await supabase
-      .from("chat_conversations")
-      .update({ last_message_at: new Date().toISOString() })
-      .eq("id", convId);
-
     if (error) {
       console.error("Send error:", error);
+      toast.error("Failed to send: " + error.message);
     }
+
     setSending(false);
   };
 
