@@ -1,13 +1,12 @@
 "use client";
 
-import { Suspense, useState, useMemo } from "react";
+import { Suspense, useState, useMemo, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useAuth } from "@/components/layout/auth-provider";
 import { motion } from "framer-motion";
-import { Crown, ArrowLeft, Loader2, CheckCircle, Smartphone, Building2 } from "lucide-react";
+import { ArrowLeft, Loader2, CheckCircle, Smartphone, Building2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const planPrices: Record<string, number> = { bronze: 9.99, silver: 19.99, gold: 39.99 };
@@ -22,36 +21,55 @@ function CheckoutContent() {
   const router = useRouter();
   const { user } = useAuth();
   const supabase = useMemo(() => createClient(), []);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const plan = searchParams.get("plan") || "bronze";
   const price = planPrices[plan] || 9.99;
 
   const [method, setMethod] = useState<"telebirr" | "cbe">("telebirr");
-  const [transactionRef, setTransactionRef] = useState("");
-  const [receiptUrl, setReceiptUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!transactionRef.trim()) return;
     if (!user) { router.push("/login"); return; }
     setSending(true);
     setError("");
-    const { error: err } = await supabase.from("payment_submissions").insert({
-      user_id: user.id,
-      plan,
-      amount: price,
-      payment_method: method,
-      transaction_ref: transactionRef.trim(),
-      receipt_url: receiptUrl.trim() || null,
-    });
-    if (err) {
-      setError(err.message);
-      setSending(false);
-      return;
+
+    try {
+      let receiptUrl: string | null = null;
+
+      if (file) {
+        const ext = file.name.split(".").pop();
+        const path = `${user.id}/${Date.now()}.${ext}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("receipts")
+          .upload(path, file);
+
+        if (uploadError) throw new Error(uploadError.message);
+
+        const { data: urlData } = supabase.storage
+          .from("receipts")
+          .getPublicUrl(path);
+
+        receiptUrl = urlData?.publicUrl || null;
+      }
+
+      const { error: insertError } = await supabase.from("payment_submissions").insert({
+        user_id: user.id,
+        plan,
+        amount: price,
+        payment_method: method,
+        receipt_url: receiptUrl,
+      });
+
+      if (insertError) throw new Error(insertError.message);
+
+      setDone(true);
+    } catch (e: any) {
+      setError(e.message);
     }
-    setDone(true);
     setSending(false);
   }
 
@@ -66,7 +84,7 @@ function CheckoutContent() {
           </div>
           <CardTitle className="text-2xl font-bold">Submission Sent!</CardTitle>
           <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-            Your payment will be reviewed by the team within 24 hours. You will receive a notification once approved.
+            Your payment will be reviewed by the team within 24 hours. You will be notified once approved.
           </p>
           <Button onClick={() => router.push("/membership")} variant="outline" className="gap-2">
             <ArrowLeft className="h-4 w-4" /> Back to Plans
@@ -85,7 +103,6 @@ function CheckoutContent() {
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Plan summary */}
         <div className="rounded-xl border border-gold/20 bg-gold/5 p-4">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm text-muted-foreground">Plan</span>
@@ -100,7 +117,6 @@ function CheckoutContent() {
           </ul>
         </div>
 
-        {/* Payment instructions */}
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-3">
           <h3 className="text-sm font-semibold">Payment Instructions</h3>
           <p className="text-xs text-muted-foreground">Send the exact amount to one of the following accounts:</p>
@@ -122,7 +138,6 @@ function CheckoutContent() {
           </div>
         </div>
 
-        {/* Payment form */}
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="text-sm text-muted-foreground mb-2 block">Payment Method</label>
@@ -153,29 +168,36 @@ function CheckoutContent() {
           </div>
 
           <div>
-            <label className="text-sm text-muted-foreground mb-1 block">Transaction Reference</label>
-            <Input
-              required
-              value={transactionRef}
-              onChange={(e) => setTransactionRef(e.target.value)}
-              placeholder="Enter transaction ID / reference number"
-              className="bg-zinc-800 border-zinc-700"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm text-muted-foreground mb-1 block">Receipt Screenshot URL (optional)</label>
-            <Input
-              value={receiptUrl}
-              onChange={(e) => setReceiptUrl(e.target.value)}
-              placeholder="Paste image URL (e.g. from imgur)"
-              className="bg-zinc-800 border-zinc-700"
-            />
+            <label className="text-sm text-muted-foreground mb-2 block">Screenshot (receipt)</label>
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-zinc-700 rounded-xl p-6 text-center cursor-pointer hover:border-amber-500/50 transition-colors"
+            >
+              {file ? (
+                <div className="space-y-2">
+                  <img src={URL.createObjectURL(file)} alt="Receipt preview" className="max-h-40 mx-auto rounded-lg" />
+                  <p className="text-xs text-zinc-500">{file.name}</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Upload className="h-8 w-8 mx-auto text-zinc-500" />
+                  <p className="text-sm text-zinc-500">Tap to upload screenshot</p>
+                  <p className="text-xs text-zinc-600">PNG, JPG or WEBP</p>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+              />
+            </div>
           </div>
 
           {error && <p className="text-xs text-red-500">{error}</p>}
 
-          <Button type="submit" disabled={!transactionRef.trim() || sending} className="w-full bg-gold text-black hover:bg-gold-dark">
+          <Button type="submit" disabled={sending} className="w-full bg-gold text-black hover:bg-gold-dark">
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : `Submit Payment — $${price.toFixed(2)}`}
           </Button>
         </form>

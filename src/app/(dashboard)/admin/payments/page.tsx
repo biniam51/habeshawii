@@ -14,7 +14,7 @@ type Submission = {
   amount: number;
   payment_method: string;
   receipt_url: string | null;
-  transaction_ref: string;
+  transaction_ref: string | null;
   status: string;
   created_at: string;
   reviewed_at: string | null;
@@ -74,11 +74,10 @@ export default function AdminPayments() {
                 <div className="space-y-1 text-sm">
                   <p className="font-medium">{s.profiles?.full_name || s.profiles?.email || "Unknown"}</p>
                   <p className="text-zinc-500 capitalize">{s.plan} — ${s.amount.toFixed(2)} via {s.payment_method}</p>
-                  <p className="text-zinc-500">Ref: {s.transaction_ref}</p>
                   <p className="text-zinc-500 text-xs">{new Date(s.created_at).toLocaleString()}</p>
                   {s.receipt_url && (
                     <a href={s.receipt_url} target="_blank" rel="noopener noreferrer" className="text-amber-500 hover:underline text-xs inline-block mt-1">
-                      View Receipt
+                      <img src={s.receipt_url} alt="Payment receipt" className="max-h-32 rounded-lg mt-2 border border-zinc-700" />
                     </a>
                   )}
                 </div>
@@ -106,7 +105,7 @@ export default function AdminPayments() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">{s.profiles?.full_name || s.profiles?.email || "Unknown"}</p>
-                    <p className="text-zinc-500 text-xs capitalize">{s.plan} — ${s.amount.toFixed(2)} — Ref: {s.transaction_ref}</p>
+                    <p className="text-zinc-500 text-xs capitalize">{s.plan} — ${s.amount.toFixed(2)}</p>
                   </div>
                   <span className={`text-xs font-medium ${s.status === "approved" ? "text-green-500" : "text-red-500"}`}>
                     {s.status === "approved" ? "Approved" : "Rejected"}
