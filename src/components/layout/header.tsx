@@ -68,7 +68,7 @@ export function Header() {
                   <p className="text-sm font-medium truncate">{user.email}</p>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem render={<Link href="/dashboard" />}>
+                <DropdownMenuItem render={<Link href={user?.email === "biniyammulat51@gmail.com" ? "/admin" : "/dashboard"} />}>
                   <LayoutDashboard className="mr-2 h-4 w-4" />
                   Dashboard
                 </DropdownMenuItem>
@@ -149,7 +149,7 @@ export function Header() {
               <div className="flex flex-col gap-2 border-t border-border pt-4">
                 {user ? (
                   <>
-                    <Link href="/dashboard" onClick={() => setOpen(false)}>
+                    <Link href={user?.email === "biniyammulat51@gmail.com" ? "/admin" : "/dashboard"} onClick={() => setOpen(false)}>
                       <Button variant="ghost" className="w-full justify-start">
                         <LayoutDashboard className="mr-2 h-4 w-4" />
                         Dashboard
