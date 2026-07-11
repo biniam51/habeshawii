@@ -8,17 +8,9 @@ import { Loader2, CheckCircle, XCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type Submission = {
-  id: string;
-  user_id: string;
-  plan: string;
-  amount: number;
-  payment_method: string;
-  receipt_url: string | null;
-  receipt_data: string | null;
-  transaction_ref: string | null;
-  status: string;
+  id: string; user_id: string; plan: string; amount: number;
+  payment_method: string; transaction_ref: string; status: string;
   created_at: string;
-  reviewed_at: string | null;
   profiles?: { email: string | null; full_name: string | null };
 };
 
@@ -36,19 +28,13 @@ export default function AdminPayments() {
   }, [user]);
 
   async function load() {
-    const { data } = await supabase
-      .from("payment_submissions")
-      .select("*, profiles!user_id(email, full_name)")
-      .order("created_at", { ascending: false });
+    const { data } = await supabase.from("payment_submissions").select("*, profiles!user_id(email, full_name)").order("created_at", { ascending: false });
     if (data) setSubmissions(data);
     setLoading(false);
   }
 
   async function review(id: string, status: "approved" | "rejected") {
-    await supabase
-      .from("payment_submissions")
-      .update({ status, reviewed_by: user!.id, reviewed_at: new Date().toISOString() })
-      .eq("id", id);
+    await supabase.from("payment_submissions").update({ status, reviewed_by: user!.id, reviewed_at: new Date().toISOString() }).eq("id", id);
     load();
   }
 
@@ -60,8 +46,6 @@ export default function AdminPayments() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Payment Submissions</h1>
-
-      {/* Pending */}
       <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
         <Clock className="h-4 w-4 text-amber-500" /> Pending ({pending.length})
       </h2>
@@ -75,12 +59,8 @@ export default function AdminPayments() {
                 <div className="space-y-1 text-sm">
                   <p className="font-medium">{s.profiles?.full_name || s.profiles?.email || "Unknown"}</p>
                   <p className="text-zinc-500 capitalize">{s.plan} — ${s.amount.toFixed(2)} via {s.payment_method}</p>
+                  <p className="text-zinc-500">Ref: {s.transaction_ref}</p>
                   <p className="text-zinc-500 text-xs">{new Date(s.created_at).toLocaleString()}</p>
-                  {(s.receipt_url || s.receipt_data) && (
-                    <a href={s.receipt_url || s.receipt_data || ""} target="_blank" rel="noopener noreferrer" className="text-amber-500 hover:underline text-xs inline-block mt-1">
-                      <img src={s.receipt_data || s.receipt_url || ""} alt="Payment receipt" className="max-h-40 rounded-lg mt-2 border border-zinc-700" />
-                    </a>
-                  )}
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
                   <Button size="sm" onClick={() => review(s.id, "approved")} className="bg-green-600 hover:bg-green-700">
@@ -95,8 +75,6 @@ export default function AdminPayments() {
           ))}
         </div>
       )}
-
-      {/* Reviewed history */}
       {reviewed.length > 0 && (
         <>
           <h2 className="text-lg font-semibold mb-3">History ({reviewed.length})</h2>
@@ -106,7 +84,7 @@ export default function AdminPayments() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">{s.profiles?.full_name || s.profiles?.email || "Unknown"}</p>
-                    <p className="text-zinc-500 text-xs capitalize">{s.plan} — ${s.amount.toFixed(2)}</p>
+                    <p className="text-zinc-500 text-xs capitalize">{s.plan} — ${s.amount.toFixed(2)} — Ref: {s.transaction_ref}</p>
                   </div>
                   <span className={`text-xs font-medium ${s.status === "approved" ? "text-green-500" : "text-red-500"}`}>
                     {s.status === "approved" ? "Approved" : "Rejected"}
