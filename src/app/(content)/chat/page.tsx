@@ -58,7 +58,12 @@ export default function ChatPage() {
 
   // Load conversations (admin) or user conversation
   useEffect(() => {
-    if (!user || !canChat) {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    if (!isAdmin && !canChat) {
       setLoading(false);
       return;
     }
