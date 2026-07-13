@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { VideoCard } from "@/components/shared/video-card";
+import { FavoriteButton } from "@/components/shared/favorite-button";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useMembership } from "@/components/layout/membership-provider";
 import type { MembershipPlan } from "@/types";
@@ -203,15 +204,20 @@ export default function VideosPage() {
                   transition={{ delay: (i % 12) * 0.05, duration: 0.4 }}
                   className="relative"
                 >
-                  <VideoCard
-                    title={video.title}
-                    duration={video.duration}
-                    category={video.category}
-                    gradient={video.gradient}
-                    isPremium={video.isPremium}
-                    isVIP={video.isVIP}
-                    views={video.views}
-                  />
+                  <div className="relative">
+                    <div className="absolute top-2 left-2 z-10">
+                      <FavoriteButton itemType="video" itemId={video.id} />
+                    </div>
+                    <VideoCard
+                      title={video.title}
+                      duration={video.duration}
+                      category={video.category}
+                      gradient={video.gradient}
+                      isPremium={video.isPremium}
+                      isVIP={video.isVIP}
+                      views={video.views}
+                    />
+                  </div>
                   {isLocked && (
                     <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/40 backdrop-blur-[2px]">
                       <div className="flex flex-col items-center gap-1.5">

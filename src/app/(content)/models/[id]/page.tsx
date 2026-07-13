@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VideoCard } from "@/components/shared/video-card";
+import { FavoriteButton } from "@/components/shared/favorite-button";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useMembership } from "@/components/layout/membership-provider";
 import type { MembershipPlan } from "@/types";
@@ -105,7 +106,10 @@ export default function ModelProfilePage() {
             </AvatarFallback>
           </Avatar>
           <div className="mt-4 text-center sm:mt-0 sm:pb-2 sm:text-left">
-            <h1 className="text-2xl font-bold sm:text-3xl">{model.name}</h1>
+            <div className="flex items-center justify-center sm:justify-start gap-3">
+              <h1 className="text-2xl font-bold sm:text-3xl">{model.name}</h1>
+              <FavoriteButton itemType="model" itemId={model.id} />
+            </div>
             <div className="mt-1 flex flex-wrap items-center justify-center gap-3 sm:justify-start">
               <span className="flex items-center gap-1 text-sm text-muted-foreground">
                 <Camera className="h-4 w-4" />

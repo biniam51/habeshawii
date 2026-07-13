@@ -5,9 +5,9 @@ import { createClient } from "@/lib/supabase";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Loader2, CheckCircle, XCircle, Clock, ExternalLink, ImageIcon } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Clock, ExternalLink, ImageIcon, X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 
 type Submission = {
   id: string;
@@ -30,6 +30,7 @@ export default function AdminPaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updating, setUpdating] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
 
   const isAdmin = user?.email === "biniyammulat51@gmail.com";
 
@@ -99,8 +100,8 @@ export default function AdminPaymentsPage() {
               <CardContent className="py-4">
                 <div className="flex flex-col md:flex-row gap-4">
                   {s.receipt_data && (
-                    <div className="shrink-0">
-                      <img src={s.receipt_data} alt="Receipt" className="w-full md:w-32 h-24 object-cover rounded-lg border border-zinc-700" />
+                    <div className="shrink-0 cursor-pointer" onClick={() => setPreview(s.receipt_data)}>
+                      <img src={s.receipt_data} alt="Receipt" className="w-full md:w-32 h-24 object-cover rounded-lg border border-zinc-700 hover:border-gold/50 transition-colors" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0 space-y-1 text-sm">
@@ -115,7 +116,7 @@ export default function AdminPaymentsPage() {
                       {updating === s.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />} Approve
                     </Button>
                     <Button size="sm" variant="outline" className="border-red-500/30 text-red-500 hover:bg-red-500/10" disabled={updating === s.id} onClick={() => updateStatus(s.id, "rejected")}>
-                      <XCircle className="h-3 w-3" /> Reject
+                      <XCircle className="h-3 w-3" /> Flag Fraud
                     </Button>
                   </div>
                 </div>
@@ -132,9 +133,12 @@ export default function AdminPaymentsPage() {
             <Card key={s.id} className="opacity-70">
               <CardContent className="py-3">
                 <div className="flex items-center gap-3 text-sm">
+                  {s.receipt_data && (
+                    <img src={s.receipt_data} alt="" className="h-8 w-12 object-cover rounded cursor-pointer" onClick={() => setPreview(s.receipt_data)} />
+                  )}
                   <span className={`shrink-0 flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${s.status === "approved" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
                     {s.status === "approved" ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                    {s.status}
+                    {s.status === "approved" ? "approved" : "fraud"}
                   </span>
                   <span className="text-muted-foreground capitalize">{s.plan}</span>
                   <span className="text-muted-foreground">${s.amount.toFixed(2)}</span>
@@ -144,6 +148,22 @@ export default function AdminPaymentsPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {preview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setPreview(null)}>
+          <div className="relative max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute -top-3 right-0 flex gap-2">
+              <a href={preview} download="receipt.png" className="rounded-full bg-zinc-900 border border-zinc-700 p-1.5 text-zinc-400 hover:text-white transition-colors">
+                <Download className="h-4 w-4" />
+              </a>
+              <button onClick={() => setPreview(null)} className="rounded-full bg-zinc-900 border border-zinc-700 p-1.5 text-zinc-400 hover:text-white transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <img src={preview} alt="Receipt full size" className="max-h-[85vh] max-w-[85vw] rounded-lg object-contain" />
+          </div>
         </div>
       )}
     </div>

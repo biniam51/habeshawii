@@ -2,7 +2,7 @@ DROP TABLE IF EXISTS payment_submissions CASCADE;
 
 CREATE TABLE payment_submissions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   plan TEXT NOT NULL CHECK (plan IN ('bronze', 'silver', 'gold')),
   amount DECIMAL(10,2) NOT NULL,
   payment_method TEXT NOT NULL CHECK (payment_method IN ('telebirr', 'cbe')),

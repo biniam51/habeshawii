@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useAuth } from "@/components/layout/auth-provider";
 import { motion } from "framer-motion";
-import { ArrowLeft, Loader2, CheckCircle, Clock, Smartphone, Building2, Upload } from "lucide-react";
+import { ArrowLeft, Loader2, CheckCircle, Clock, XCircle, Smartphone, Building2, Upload, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -23,40 +23,104 @@ function CheckoutContent() {
   const [method, setMethod] = useState<"telebirr" | "cbe">("telebirr");
   const [image, setImage] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [done, setDone] = useState(false);
   const [error, setError] = useState("");
-  const [existing, setExisting] = useState<any>(null);
+  const [sub, setSub] = useState<any>(null);
   const [checking, setChecking] = useState(true);
+  const [membership, setMembership] = useState<any>(null);
+
+  async function fetchData() {
+    if (!user) return;
+    const { data: payData } = await supabase
+      .from("payment_submissions")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("plan", plan)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setSub(payData || null);
+
+    if (payData?.status === "approved") {
+      const { data: memData } = await supabase
+        .from("user_memberships")
+        .select("expires_at")
+        .eq("user_id", user.id)
+        .eq("plan_name", payData.plan)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setMembership(memData || null);
+    }
+    setChecking(false);
+  }
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("payment_submissions").select("*").eq("user_id", user.id).eq("status", "pending").maybeSingle().then(({ data }) => {
-      if (data) setExisting(data);
-      setChecking(false);
-    });
-  }, [user]);
+    fetchData();
 
-  if (checking) return <Card className="border-border/50 bg-card/50 backdrop-blur-sm"><CardContent className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gold" /></CardContent></Card>;
+    const channel = supabase
+      .channel("payment-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "payment_submissions", filter: `user_id=eq.${user.id}` }, () => {
+        fetchData();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, plan]);
 
-  if (existing) return (
-    <Card className="border-border/50 bg-card/50 backdrop-blur-sm text-center">
-      <CardContent className="pt-8 pb-8 space-y-4">
-        <div className="flex justify-center"><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10"><Clock className="h-8 w-8 text-amber-500" /></div></div>
-        <CardTitle className="text-2xl font-bold">Pending Review</CardTitle>
-        <p className="text-sm text-muted-foreground">Your payment for <strong className="capitalize">{existing.plan}</strong> is being reviewed.</p>
-        {existing.receipt_data && <img src={existing.receipt_data} alt="Receipt" className="max-h-32 mx-auto rounded-lg border border-zinc-700" />}
-        <p className="text-xs text-zinc-500">{new Date(existing.created_at).toLocaleString()}</p>
-        <Button onClick={() => router.push("/membership")} variant="outline"><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>
-      </CardContent>
+  function daysRemaining(expiresAt: string | null) {
+    if (!expiresAt) return null;
+    const diff = new Date(expiresAt).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }
+
+  if (checking) return (
+    <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+      <CardContent className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gold" /></CardContent>
     </Card>
   );
 
-  if (done) return (
-    <Card className="border-border/50 bg-card/50 backdrop-blur-sm text-center">
+  if (sub?.status === "approved") {
+    const days = daysRemaining(membership?.expires_at);
+    return (
+      <Card className="border-green-500/30 bg-green-500/5 text-center">
+        <CardContent className="pt-8 pb-8 space-y-4">
+          <div className="flex justify-center"><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-green-500/10"><CheckCircle className="h-8 w-8 text-green-500" /></div></div>
+          <CardTitle className="text-2xl font-bold text-green-500">Approved!</CardTitle>
+          <p className="text-sm text-muted-foreground">Your <strong className="capitalize">{sub.plan}</strong> membership is active.</p>
+          {days !== null && <p className="text-3xl font-bold text-gold">{days} <span className="text-sm font-normal text-muted-foreground">days remaining</span></p>}
+          {sub.receipt_data && <img src={sub.receipt_data} alt="Receipt" className="max-h-24 mx-auto rounded-lg border border-zinc-700 opacity-60" />}
+          <Button onClick={() => router.push("/dashboard")}>Go to Dashboard</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (sub?.status === "rejected") {
+    return (
+      <Card className="border-red-500/30 bg-red-500/5 text-center">
+        <CardContent className="pt-8 pb-8 space-y-4">
+          <div className="flex justify-center"><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500/10"><XCircle className="h-8 w-8 text-red-500" /></div></div>
+          <CardTitle className="text-2xl font-bold text-red-500">Flagged as Fraud</CardTitle>
+          <p className="text-sm text-muted-foreground">Your payment submission was flagged as potential fraud. Please upload a valid receipt screenshot to proceed.</p>
+          {sub.receipt_data && <img src={sub.receipt_data} alt="Rejected receipt" className="max-h-24 mx-auto rounded-lg border border-zinc-700 opacity-50" />}
+          <Button onClick={async () => {
+            await supabase.from("payment_submissions").delete().eq("id", sub.id);
+            setSub(null);
+            setImage(null);
+          }} variant="outline" className="gap-2"><RefreshCw className="h-4 w-4" /> Try Again</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (sub?.status === "pending") return (
+    <Card className="border-amber-500/20 bg-amber-500/5 text-center">
       <CardContent className="pt-8 pb-8 space-y-4">
-        <div className="flex justify-center"><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-green-500/10"><CheckCircle className="h-8 w-8 text-green-500" /></div></div>
-        <CardTitle className="text-2xl font-bold">Submitted!</CardTitle>
-        <p className="text-sm text-muted-foreground">Your payment screenshot will be reviewed within 24 hours.</p>
+        <div className="flex justify-center"><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10"><Clock className="h-8 w-8 text-amber-500" /></div></div>
+        <CardTitle className="text-2xl font-bold">Pending Review</CardTitle>
+        <p className="text-sm text-muted-foreground">Your <strong className="capitalize">{sub.plan}</strong> payment is being reviewed.</p>
+        {sub.receipt_data && <img src={sub.receipt_data} alt="Receipt" className="max-h-32 mx-auto rounded-lg border border-zinc-700" />}
+        <p className="text-xs text-zinc-500">{new Date(sub.created_at).toLocaleString()}</p>
         <Button onClick={() => router.push("/membership")} variant="outline"><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>
       </CardContent>
     </Card>
@@ -71,7 +135,7 @@ function CheckoutContent() {
       user_id: user.id, plan, amount: price, payment_method: method, receipt_data: image,
     });
     if (err) { setError(err.message); setSending(false); return; }
-    setDone(true);
+    await fetchData();
     setSending(false);
   }
 

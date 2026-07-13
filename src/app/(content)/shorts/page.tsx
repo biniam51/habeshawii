@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Heart, MessageCircle, Share2, Volume2, VolumeX, Lock, Play, ChevronUp, Crown, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { FavoriteButton } from "@/components/shared/favorite-button";
 import { useAuth } from "@/components/layout/auth-provider";
 import { useMembership } from "@/components/layout/membership-provider";
 import type { MembershipPlan } from "@/types";
@@ -183,29 +184,7 @@ export default function ShortsPage() {
 
               {/* Right side action buttons */}
               <div className="absolute right-4 bottom-24 z-10 flex flex-col items-center gap-5">
-                <button
-                  onClick={() => toggleLike(short.id)}
-                  className="flex flex-col items-center gap-1 transition-transform active:scale-125"
-                >
-                  <div
-                    className={`flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-sm transition-colors ${
-                      liked.has(short.id)
-                        ? "bg-gold text-black"
-                        : "bg-white/10 text-white"
-                    }`}
-                  >
-                    <Heart
-                      className={`h-5 w-5 ${
-                        liked.has(short.id) ? "fill-current" : ""
-                      }`}
-                    />
-                  </div>
-                  <span className="text-[10px] text-white/70">
-                    {formatCount(
-                      short.likes + (liked.has(short.id) ? 1 : 0)
-                    )}
-                  </span>
-                </button>
+                <FavoriteButton itemType="short" itemId={short.id} size="md" />
 
                 <button className="flex flex-col items-center gap-1">
                   <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm transition-colors hover:bg-white/20">
