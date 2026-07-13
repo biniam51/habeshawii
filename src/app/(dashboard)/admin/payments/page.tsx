@@ -25,9 +25,8 @@ export default function AdminPayments() {
 
   async function review(id: string, status: "approved" | "rejected") {
     await supabase.from("payment_submissions").update({ status, reviewed_by: user!.id, reviewed_at: new Date().toISOString() }).eq("id", id);
-    supabase.from("payment_submissions").select("*, profiles!user_id(email, full_name)").order("created_at", { ascending: false }).then(({ data }) => {
-      if (data) setSubmissions(data);
-    });
+    const { data } = await supabase.from("payment_submissions").select("*, profiles!user_id(email, full_name)").order("created_at", { ascending: false });
+    if (data) setSubmissions(data);
   }
 
   if (loading) return <div className="flex items-center justify-center min-h-[50vh]"><Loader2 className="h-8 w-8 animate-spin text-amber-500" /></div>;
@@ -43,15 +42,15 @@ export default function AdminPayments() {
       {pending.length === 0 ? (
         <p className="text-sm text-zinc-500 mb-6">No pending submissions</p>
       ) : (
-        <div className="space-y-3 mb-8">
+        <div className="space-y-4 mb-8">
           {pending.map((s: any) => (
             <div key={s.id} className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
               <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1 text-sm">
+                <div className="space-y-2 text-sm flex-1">
                   <p className="font-medium">{s.profiles?.full_name || s.profiles?.email || "Unknown"}</p>
                   <p className="text-zinc-500 capitalize">{s.plan} — ${Number(s.amount).toFixed(2)} via {s.payment_method}</p>
-                  <p className="text-zinc-500">Ref: {s.transaction_ref}</p>
                   <p className="text-zinc-500 text-xs">{new Date(s.created_at).toLocaleString()}</p>
+                  {s.receipt_data && <img src={s.receipt_data} alt="Receipt" className="max-h-48 rounded-lg border border-zinc-700" />}
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
                   <Button size="sm" onClick={() => review(s.id, "approved")} className="bg-green-600 hover:bg-green-700"><CheckCircle className="h-4 w-4 mr-1" /> Approve</Button>
@@ -72,11 +71,9 @@ export default function AdminPayments() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">{s.profiles?.full_name || s.profiles?.email || "Unknown"}</p>
-                    <p className="text-zinc-500 text-xs capitalize">{s.plan} — ${Number(s.amount).toFixed(2)} — {s.transaction_ref}</p>
+                    <p className="text-zinc-500 text-xs capitalize">{s.plan} — ${Number(s.amount).toFixed(2)}</p>
                   </div>
-                  <span className={`text-xs font-medium ${s.status === "approved" ? "text-green-500" : "text-red-500"}`}>
-                    {s.status === "approved" ? "Approved" : "Rejected"}
-                  </span>
+                  <span className={`text-xs font-medium ${s.status === "approved" ? "text-green-500" : "text-red-500"}`}>{s.status === "approved" ? "Approved" : "Rejected"}</span>
                 </div>
               </div>
             ))}

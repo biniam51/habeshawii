@@ -6,7 +6,7 @@ CREATE TABLE payment_submissions (
   plan TEXT NOT NULL CHECK (plan IN ('bronze', 'silver', 'gold')),
   amount DECIMAL(10,2) NOT NULL,
   payment_method TEXT NOT NULL CHECK (payment_method IN ('telebirr', 'cbe')),
-  transaction_ref TEXT NOT NULL,
+  receipt_data TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
   reviewed_by UUID REFERENCES auth.users(id),
   reviewed_at TIMESTAMPTZ,
