@@ -7,7 +7,6 @@ CREATE TABLE payment_submissions (
   amount DECIMAL(10,2) NOT NULL,
   payment_method TEXT NOT NULL CHECK (payment_method IN ('telebirr', 'cbe')),
   transaction_ref TEXT NOT NULL,
-  receipt_data TEXT,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
   reviewed_by UUID REFERENCES auth.users(id),
   reviewed_at TIMESTAMPTZ,
@@ -47,10 +46,8 @@ BEGIN
   IF NEW.status = 'approved' AND OLD.status = 'pending' THEN
     SELECT duration_days INTO plan_days FROM membership_plans WHERE name = NEW.plan;
     IF plan_days IS NULL THEN plan_days := 30; END IF;
-
     INSERT INTO user_memberships (user_id, plan_name, status, started_at, expires_at)
     VALUES (NEW.user_id, NEW.plan, 'active', NOW(), NOW() + (plan_days || ' days')::INTERVAL);
-
     UPDATE profiles
     SET membership = NEW.plan, membership_expires_at = NOW() + (plan_days || ' days')::INTERVAL
     WHERE id = NEW.user_id;

@@ -29,7 +29,7 @@ export default function AdminOverview() {
           supabase.from("profiles").select("id"),
           supabase.from("payment_submissions").select("amount").eq("status", "approved"),
         ]);
-        const revenue = (p.data || []).reduce((sum, r) => sum + Number(r.amount), 0);
+        const revenue = (p.data || []).reduce((sum: number, r: any) => sum + Number(r.amount), 0);
         setStats({
           videos: v.data?.length ?? 0,
           shorts: s.data?.length ?? 0,

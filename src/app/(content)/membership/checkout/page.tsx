@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useState, useMemo, useEffect, useRef } from "react";
+import { Suspense, useState, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useAuth } from "@/components/layout/auth-provider";
 import { motion } from "framer-motion";
-import { ArrowLeft, Loader2, CheckCircle, Clock, Smartphone, Building2, Upload } from "lucide-react";
+import { ArrowLeft, Loader2, CheckCircle, Clock, Smartphone, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,17 +13,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 const prices: Record<string, number> = { bronze: 9.99, silver: 19.99, gold: 39.99 };
 
 function CheckoutContent() {
-  const searchParams = useSearchParams();
+  const sp = useSearchParams();
   const router = useRouter();
   const { user } = useAuth();
   const supabase = useMemo(() => createClient(), []);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const plan = searchParams.get("plan") || "bronze";
+  const plan = sp.get("plan") || "bronze";
   const price = prices[plan] || 9.99;
 
   const [method, setMethod] = useState<"telebirr" | "cbe">("telebirr");
   const [ref, setRef] = useState("");
-  const [screenshot, setScreenshot] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
@@ -38,48 +36,39 @@ function CheckoutContent() {
     });
   }, [user]);
 
-  if (checking) {
-    return <Card className="border-border/50 bg-card/50 backdrop-blur-sm"><CardContent className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gold" /></CardContent></Card>;
-  }
+  if (checking) return <Card className="border-border/50 bg-card/50 backdrop-blur-sm"><CardContent className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gold" /></CardContent></Card>;
 
-  if (existing) {
-    return (
-      <Card className="border-border/50 bg-card/50 backdrop-blur-sm text-center">
-        <CardContent className="pt-8 pb-8 space-y-4">
-          <div className="flex justify-center"><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10"><Clock className="h-8 w-8 text-amber-500" /></div></div>
-          <CardTitle className="text-2xl font-bold">Pending Review</CardTitle>
-          <p className="text-sm text-muted-foreground max-w-sm mx-auto">You already submitted payment for <strong className="capitalize">{existing.plan}</strong>. It is being reviewed.</p>
-          {existing.receipt_data && <img src={existing.receipt_data} alt="Receipt" className="max-h-32 mx-auto rounded-lg border border-zinc-700 mt-2" />}
-          <p className="text-xs text-zinc-500">Ref: {existing.transaction_ref} &middot; {new Date(existing.created_at).toLocaleString()}</p>
-          <Button onClick={() => router.push("/membership")} variant="outline" className="gap-2"><ArrowLeft className="h-4 w-4" /> Back to Plans</Button>
-        </CardContent>
-      </Card>
-    );
-  }
+  if (existing) return (
+    <Card className="border-border/50 bg-card/50 backdrop-blur-sm text-center">
+      <CardContent className="pt-8 pb-8 space-y-4">
+        <div className="flex justify-center"><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10"><Clock className="h-8 w-8 text-amber-500" /></div></div>
+        <CardTitle className="text-2xl font-bold">Pending Review</CardTitle>
+        <p className="text-sm text-muted-foreground">You already submitted payment for <strong className="capitalize">{existing.plan}</strong>. It is being reviewed.</p>
+        <p className="text-xs text-zinc-500">Ref: {existing.transaction_ref} &middot; {new Date(existing.created_at).toLocaleString()}</p>
+        <Button onClick={() => router.push("/membership")} variant="outline" className="gap-2"><ArrowLeft className="h-4 w-4" /> Back to Plans</Button>
+      </CardContent>
+    </Card>
+  );
 
-  if (done) {
-    return (
-      <Card className="border-border/50 bg-card/50 backdrop-blur-sm text-center">
-        <CardContent className="pt-8 pb-8 space-y-4">
-          <div className="flex justify-center"><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-green-500/10"><CheckCircle className="h-8 w-8 text-green-500" /></div></div>
-          <CardTitle className="text-2xl font-bold">Submitted!</CardTitle>
-          <p className="text-sm text-muted-foreground max-w-sm mx-auto">Your payment will be reviewed within 24 hours.</p>
-          <Button onClick={() => router.push("/membership")} variant="outline" className="gap-2"><ArrowLeft className="h-4 w-4" /> Back to Plans</Button>
-        </CardContent>
-      </Card>
-    );
-  }
+  if (done) return (
+    <Card className="border-border/50 bg-card/50 backdrop-blur-sm text-center">
+      <CardContent className="pt-8 pb-8 space-y-4">
+        <div className="flex justify-center"><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-green-500/10"><CheckCircle className="h-8 w-8 text-green-500" /></div></div>
+        <CardTitle className="text-2xl font-bold">Submitted!</CardTitle>
+        <p className="text-sm text-muted-foreground">Your payment will be reviewed within 24 hours.</p>
+        <Button onClick={() => router.push("/membership")} variant="outline" className="gap-2"><ArrowLeft className="h-4 w-4" /> Back to Plans</Button>
+      </CardContent>
+    </Card>
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!ref.trim() || !user) return;
     setSending(true);
     setError("");
-    console.log("Submitting with receipt_data length:", screenshot?.length || 0);
     const { error: err } = await supabase.from("payment_submissions").insert({
-      user_id: user.id, plan, amount: price, payment_method: method, transaction_ref: ref.trim(), receipt_data: screenshot,
+      user_id: user.id, plan, amount: price, payment_method: method, transaction_ref: ref.trim(),
     });
-    if (err) console.error("Insert error:", err);
     if (err) { setError(err.message); setSending(false); return; }
     setDone(true);
     setSending(false);
@@ -120,31 +109,7 @@ function CheckoutContent() {
 
           <div>
             <label className="text-sm text-muted-foreground mb-1 block">Transaction Reference</label>
-            <Input required value={ref} onChange={(e) => setRef(e.target.value)} placeholder="Enter the transaction ID" className="bg-zinc-800 border-zinc-700" />
-          </div>
-
-          <div>
-            <label className="text-sm text-muted-foreground mb-2 block">Screenshot (receipt)</label>
-            <div onClick={() => fileRef.current?.click()} className="border-2 border-dashed border-zinc-700 rounded-xl p-6 text-center cursor-pointer hover:border-amber-500/50 transition-colors">
-              {screenshot ? (
-                <div className="space-y-2">
-                  <img src={screenshot} alt="Receipt" className="max-h-36 mx-auto rounded-lg" />
-                  <p className="text-xs text-zinc-500">Tap to change</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Upload className="h-8 w-8 mx-auto text-zinc-500" />
-                  <p className="text-sm text-zinc-500">Tap to upload screenshot</p>
-                  <p className="text-xs text-zinc-600">PNG, JPG or WEBP</p>
-                </div>
-              )}
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
-                const f = e.target.files?.[0]; if (!f) return;
-                const r = new FileReader();
-                r.onload = (ev) => { const d = ev.target?.result as string; setScreenshot(d); };
-                r.readAsDataURL(f);
-              }} />
-            </div>
+            <Input required value={ref} onChange={(e) => setRef(e.target.value)} placeholder="Enter the transaction ID from your payment" className="bg-zinc-800 border-zinc-700" />
           </div>
 
           {error && <p className="text-xs text-red-500">{error}</p>}
