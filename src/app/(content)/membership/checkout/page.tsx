@@ -46,7 +46,7 @@ function CheckoutContent() {
         <p className="text-sm text-muted-foreground">Your payment for <strong className="capitalize">{existing.plan}</strong> is being reviewed.</p>
         {existing.receipt_data && <img src={existing.receipt_data} alt="Receipt" className="max-h-32 mx-auto rounded-lg border border-zinc-700" />}
         <p className="text-xs text-zinc-500">{new Date(existing.created_at).toLocaleString()}</p>
-        <Button onClick={() => router.push("/membership")} variant="outline" className="gap-2"><ArrowLeft className="h-4 w-4" /> Back</Button>
+        <Button onClick={() => router.push("/membership")} variant="outline"><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>
       </CardContent>
     </Card>
   );
@@ -57,7 +57,7 @@ function CheckoutContent() {
         <div className="flex justify-center"><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-green-500/10"><CheckCircle className="h-8 w-8 text-green-500" /></div></div>
         <CardTitle className="text-2xl font-bold">Submitted!</CardTitle>
         <p className="text-sm text-muted-foreground">Your payment screenshot will be reviewed within 24 hours.</p>
-        <Button onClick={() => router.push("/membership")} variant="outline" className="gap-2"><ArrowLeft className="h-4 w-4" /> Back</Button>
+        <Button onClick={() => router.push("/membership")} variant="outline"><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>
       </CardContent>
     </Card>
   );
@@ -140,7 +140,7 @@ function CheckoutContent() {
         </form>
 
         <div className="text-center">
-          <Button variant="ghost" size="sm" onClick={() => router.push("/membership")} className="gap-2 text-xs"><ArrowLeft className="h-3 w-3" /> Back</Button>
+          <Button variant="ghost" size="sm" onClick={() => router.push("/membership")}><ArrowLeft className="h-3 w-3 mr-1" /> Back</Button>
         </div>
       </CardContent>
     </Card>

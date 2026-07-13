@@ -8,38 +8,36 @@ CREATE TABLE payment_submissions (
   payment_method TEXT NOT NULL CHECK (payment_method IN ('telebirr', 'cbe')),
   receipt_data TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-  reviewed_by UUID REFERENCES auth.users(id),
+  reviewed_by UUID,
   reviewed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE payment_submissions ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Users can insert own payments" ON payment_submissions;
-CREATE POLICY "Users can insert own payments"
-  ON payment_submissions FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+-- Users can insert their own payments
+DROP POLICY IF EXISTS "insert_own" ON payment_submissions;
+CREATE POLICY "insert_own" ON payment_submissions
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Users can read own payments" ON payment_submissions;
-CREATE POLICY "Users can read own payments"
-  ON payment_submissions FOR SELECT
-  USING (auth.uid() = user_id);
+-- Users can read their own payments
+DROP POLICY IF EXISTS "read_own" ON payment_submissions;
+CREATE POLICY "read_own" ON payment_submissions
+  FOR SELECT USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "Admins can read all payments" ON payment_submissions;
-CREATE POLICY "Admins can read all payments"
-  ON payment_submissions FOR SELECT
-  USING (public.is_admin());
+-- Admin can read all payments (uses email from JWT - no custom function needed)
+DROP POLICY IF EXISTS "admin_read" ON payment_submissions;
+CREATE POLICY "admin_read" ON payment_submissions
+  FOR SELECT USING (auth.jwt() ->> 'email' = 'biniyammulat51@gmail.com');
 
-DROP POLICY IF EXISTS "Admins can update payments" ON payment_submissions;
-CREATE POLICY "Admins can update payments"
-  ON payment_submissions FOR UPDATE
-  USING (public.is_admin());
+-- Admin can update payments
+DROP POLICY IF EXISTS "admin_update" ON payment_submissions;
+CREATE POLICY "admin_update" ON payment_submissions
+  FOR UPDATE USING (auth.jwt() ->> 'email' = 'biniyammulat51@gmail.com');
 
+-- Auto-upgrade membership when payment is approved
 CREATE OR REPLACE FUNCTION public.approve_payment()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   plan_days INT;
 BEGIN

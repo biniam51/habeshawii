@@ -96,8 +96,7 @@ export interface PaymentSubmission {
   plan: MembershipPlan;
   amount: number;
   payment_method: "telebirr" | "cbe";
-  receipt_url: string | null;
-  transaction_ref: string;
+  receipt_data: string;
   status: PaymentStatus;
   reviewed_by: string | null;
   created_at: string;
